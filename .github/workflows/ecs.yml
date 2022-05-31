@@ -49,7 +49,7 @@ jobs:
     steps:
       - name: RETAG!
         run: |
-          aws ecr batch-delete-image --repository-name graphql/$environment --image-ids imageTag=latest
+          aws ecr batch-delete-image --repository-name graphql/${{ github.event.inputs.environment }} --image-ids imageTag=latest
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
