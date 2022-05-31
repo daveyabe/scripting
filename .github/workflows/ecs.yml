@@ -45,7 +45,7 @@ jobs:
           AWS_DEFAULT_REGION: 'us-east-1'
   ecs-retag:
     runs-on: ubuntu-latest
-    if:  ${{ "$environment_builtin" == "develop" }} 
+    if:  ${{ "github.event.inputs.environment_builtin" == "develop" }} 
     steps:
       - name: RETAG!
         run: |
