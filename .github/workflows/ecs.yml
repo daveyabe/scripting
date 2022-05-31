@@ -18,8 +18,8 @@ on:
         - LCMSQL
         - MaldiQL
         - WorkflowQL
-      print_tags:
-        description: 'True to print to STDOUT'
+      rollback:
+        description: 'True to enable rollback'
         required: true 
         type: boolean 
       tags:
@@ -32,9 +32,14 @@ on:
         required: true 
 
 jobs:
-  print-tag:
+  ecs-list:
     runs-on: ubuntu-latest
-    if:  ${{ github.event.inputs.print_tags == 'true' }} 
+    if:  ${{ github.event.inputs.rollback == 'true' }} 
     steps:
-      - name: Print the input tag to STDOUT
-        run: echo  The tags are ${{ github.event.inputs.tags }} 
+      - name: LIST CLUSTERS!
+            run: |
+              aws ecs list-clusters
+            env:
+              AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+              AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+              AWS_DEFAULT_REGION: 'us-east-1'
