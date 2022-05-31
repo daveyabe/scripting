@@ -2,24 +2,32 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to Rollback'
-        required: false
-        default: 'develop' 
+        description: 'Service to Rollback'
+        required: true
+        default: 'FilesQL' 
         type: choice
         options:
-        - develop
-        - staging
-        - production 
+        - AnalyticsQL
+        - BiochemQL
+        - ChemspaceQL
+        - ContainerQL
+        - EnzymeQL
+        - FilesQL
+        - InstumentQL        
+        - InventoryQL
+        - LCMSQL
+        - MaldiQL
+        - WorkflowQL
       print_tags:
         description: 'True to print to STDOUT'
         required: true 
         type: boolean 
       tags:
-        description: 'Test scenario tags'
-        required: true 
+        description: 'Hash to Rollback to!'
+        required: false 
         type: string
       environment_builtin:
-        description: 'Environment to run tests against'
+        description: 'Environment to Rollback!'
         type: environment
         required: true 
 
