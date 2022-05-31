@@ -7,17 +7,17 @@ on:
         default: 'FilesQL' 
         type: choice
         options:
-        - AnalyticsQL
-        - BiochemQL
-        - ChemspaceQL
-        - ContainerQL
-        - EnzymeQL
-        - FilesQL
-        - InstumentQL        
-        - InventoryQL
-        - LCMSQL
-        - MaldiQL
-        - WorkflowQL
+        - analytics
+        - biochem
+        - chemspace
+        - container
+        - enzyme
+        - files
+        - instrument      
+        - inventory
+        - lcms
+        - maldi
+        - workflow
       rollback:
         description: 'True to enable rollback'
         required: true 
