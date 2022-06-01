@@ -50,8 +50,9 @@ jobs:
       - name: RETAG!
         run: |
           aws ecr batch-delete-image --repository-name graphql/${{ github.event.inputs.environment }} --image-ids imageTag=latest
-          MY_MANIFEST=$(aws ecr batch-get-image --repository-name graphql/${{ github.event.inputs.environment }} --image-ids imageTag=${{ github.event.inputs.hash }} --region us-east-1 --query images[].imageManifest --output text)
-          echo $MY_MANIFEST
+          echo "MY_MANIFEST=aws ecr batch-get-image --repository-name graphql/${{ github.event.inputs.environment }} --image-ids imageTag=${{ github.event.inputs.hash }} --region us-east-1 --query images[].imageManifest --output text" >> $GITHUB_ENV
+          #MY_MANIFEST=$(aws ecr batch-get-image --repository-name graphql/${{ github.event.inputs.environment }} --image-ids imageTag=${{ github.event.inputs.hash }} --region us-east-1 --query images[].imageManifest --output text)
+          echo "${{ env.MY_MANIFEST }}"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
