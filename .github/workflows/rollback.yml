@@ -53,7 +53,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: 'us-east-1'
       - name: Run rollback
-        run: sh /.github/ecs-rollback.sh
+        run: sh ./.github/ecs-rollback.sh
         env:
           environment: ${{ github.event.inputs.environment }}
           hash: ${{ github.event.inputs.hash }}
