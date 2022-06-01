@@ -62,6 +62,8 @@ jobs:
           chmod +x ./scripts/ecs-rollback.sh
           sh ./scripts/ecs-rollback.sh
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           environment: ${{ github.event.inputs.environment }}
           hash: ${{ github.event.inputs.hash }}
           tag: ${{ github.event.inputs.tag }}
