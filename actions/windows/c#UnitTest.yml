@@ -1,0 +1,40 @@
+name: Unit Testing
+
+on:
+   workflow_dispatch:
+    inputs:
+      ENVIRONMENT:
+        description: 'STAGING or PRODUCTION?'
+        type: choice
+        required: true
+        default: 'staging'
+        options: 
+        - staging
+        - development
+        - production
+      BARCODE:
+        required: false
+        default: 'WF10561'
+        description: throw in your workflow   
+
+jobs:
+  build:
+    name: TESTING
+    runs-on: spectralvm01
+    #on-prem Windows runner
+    environment: ${{ inputs.ENVIRONMENT}}  
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - uses: actions/setup-dotnet@v4
+    - run: |
+        dotnet --version
+        cd IntegrationSoftware/Aether.Auto.GraphQL
+        C:\nuget\nuget.exe restore -PackagesDirectory ..\packages -ConfigFile C:\Users\LabUser\AppData\Roaming\NuGet\NuGet.Config
+        cd ..
+        cd NifflerSampleTracking
+        dotnet build
+        cd bin\debug
+        C:\Users\LabUser\actions-runner\_work\integration-software\integration-software\IntegrationSoftware\SampleTracking\bin\debug\SampleTracking.exe "${{ inputs.ENVIRONMENT}}" "${{ inputs.BARCODE}}"
