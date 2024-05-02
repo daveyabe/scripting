@@ -1,0 +1,31 @@
+name: build WIN exe
+
+on:
+   workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run make on Windows
+      run: |
+         make
+    - name: Generate Artifact
+      uses: actions/upload-artifact@v2
+      with:
+       name: PROJECTNAME-EXE
+       path: dist
+       retention-days: 14
+    - name: Setup AWS CLI
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID2 }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ID2 }}
+          aws-region: us-east-1
+    - name: Sync files to S3 bucket
+      id: S3
+      run: |
+          aws s3 sync dist s3://projectname/exe --delete
+    - name: Link To Report
+      run: echo "https://s3.amazonaws.com/bucketName/${{steps.S3.outputs.object_key}}/dist" 
