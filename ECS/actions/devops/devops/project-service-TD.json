@@ -1,0 +1,106 @@
+{
+	"projectDefinitions": [
+		{
+			"name": "project_nginx",
+			"image": "0150421234.dkr.ecr.us-east-1.amazonaws.com/graphql/nginx:prodlatest",
+			"cpu": 0,
+			"memoryReservation": 4096,
+			"portMappings": [
+				{
+					"containerPort": 80,
+					"hostPort": 80,
+					"protocol": "tcp"
+				}
+			],
+			"essential": true,
+			"environment": [],
+			"mountPoints": [
+				{
+					"sourceVolume": "static",
+					"containerPath": "/opt/app/settings/static"
+				}
+			],
+			"volumesFrom": [],
+			"logConfiguration": {
+				"logDriver":"awsfirelens",
+				"options": {
+					"Name": "datadog",
+					"Host": "http-intake.logs.us5.datadoghq.com",
+					"TLS": "on",
+					"apikey": "SOMEKEY",
+					"dd_service": "projectprod",
+					"dd_source": "nginx",
+					"dd_tags": "project:prod,project:nginx,gateway:api,service:project",
+					"provider": "ecs",
+					"retry_limit": "2"
+				}
+			}
+		},
+		{
+			"name": "project_django",
+			"image": "0150421234.dkr.ecr.us-east-1.amazonaws.com/graphql/project:latest",
+			"cpu": 0,
+			"memoryReservation": 8192,
+			"portMappings": [
+				{
+					"containerPort": 8000,
+					"hostPort": 8000,
+					"protocol": "tcp"
+				}
+			],
+			"essential": true,
+			"environment": [],
+			"mountPoints": [
+				{
+					"sourceVolume": "static",
+					"containerPath": "/opt/app/settings/static"
+				}
+			],
+			"volumesFrom": [],
+			"logConfiguration": {
+				"logDriver":"awsfirelens",
+				"options": {
+					"Name": "datadog",
+					"Host": "http-intake.logs.us5.datadoghq.com",
+					"TLS": "on",
+					"apikey": "SOMEKEY",
+					"dd_service": "projectprod",
+					"dd_source": "django",
+					"dd_tags": "project:prod,project:django,gateway:api,service:project",
+					"provider": "ecs",
+					"retry_limit": "2"
+				}
+			}
+		},
+		{
+			"name": "log_router",
+			"image": "amazon/aws-for-fluent-bit:stable",
+			"logConfiguration": null,
+			"firelensConfiguration": {
+				"type": "fluentbit",
+				"options": {
+					"enable-ecs-log-metadata": "true"
+				}
+			}
+		}
+	],
+	"family": "project_ecs_td",
+	"taskRoleArn": "arn:aws:iam::015042123:role/ecsTaskExecutionRole",
+	"executionRoleArn": "arn:aws:iam::015042123:role/ecsTaskExecutionRole",
+	"networkMode": "awsvpc",
+	"volumes": [
+		{
+			"name": "static",
+			"host": {}
+		}
+	],
+	"placementConstraints": [],
+	"runtimePlatform": {
+		"operatingSystemFamily": "LINUX"
+	},
+	"requiresCompatibilities": [
+		"FARGATE"
+	],
+	"cpu": "8192",
+	"memory": "16384"
+}
