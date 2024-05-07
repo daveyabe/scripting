@@ -1,0 +1,42 @@
+name: Deploy to On-Premise APP PROD VM
+
+on:
+  push:
+    branches:
+      - "master"
+  workflow_dispatch: 
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: onpremise-server
+    environment: production
+    env:
+      PG_PASS: ${{ secrets.PG_PASS }}    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: KILL
+      continue-on-error: true
+      run: |
+        sudo pkill streamlit   
+      # See: https://github.com/marketplace/actions/setup-miniconda
+
+    - name: Rando MV/TOUCH/CHMOD commandos
+      run: |
+        sudo rm -rf /opt/app/appname.prev     
+        sudo mv /opt/app/appname /opt/app/appname.prev
+        sudo mkdir /opt/app/appname
+        sudo mv * /opt/app/appname
+        sudo touch /opt/app/appname/app.out.log
+        sudo touch /opt/app/appname/app.err.log
+        sudo chmod 777 /opt/app/appname/app.err.log
+        sudo chmod 777 /opt/app/appname/app.out.log
+    - name: START
+      run: |
+        cd /opt/app/appname
+        sudo /root/anaconda3/bin/conda run -n appname streamlit run app.py --server.port=80 --server.address=0.0.0.0 --server.fileWatcherType=none > app.out.log 2> app.err.log < /dev/null &
