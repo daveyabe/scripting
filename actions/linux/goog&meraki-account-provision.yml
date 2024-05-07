@@ -1,0 +1,113 @@
+name: provision user accounts!
+
+on:
+   workflow_dispatch:
+    inputs:
+      FIRST:
+        description: 'Full first name:'
+        required: true
+        default: 'Jane'
+        
+      LAST:
+        description: 'Full last name:'
+        required: true
+        default: 'Doe'
+        
+      LOGIN:
+        description: 'Login name? (typically first initial+last name)'
+        required: true
+        default: 'jdoe'  
+
+      TEMP_PASS:
+        description: 'Temporary Password?'
+        required: true
+        default: 'defaultpw'  
+        
+      CONTRACTOR:
+        description: 'Please check if this is a Contractor'
+        type: boolean
+
+      Google_Workspace:
+        type: boolean
+        description: should we make a Google workspace account?
+        
+      Meraki_VPN:
+        type: boolean
+        description: should we make a Meraki VPN account?
+
+      Slack:
+        type: boolean
+        description: should we send a Slack invite?
+
+#      CONTRACTOR2:
+#        description: 'Please check if this is a Contractor'
+#        type: choice
+#        required: false
+#        default: 'PRODUCTION'
+#        options: 
+#        - STAGING
+#        - PRODUCTION
+
+jobs:
+
+  provision_google:
+    name: GBUILD
+    runs-on: onprem-server
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Create Google Account
+      id: google-workspace
+      if: ${{ inputs.Google_Workspace != '' }} 
+      run: |
+        /home/user/bin/gam/gam info domain
+        /home/user/bin/gam/gam create user ${{ inputs.LOGIN}} firstname ${{ inputs.FIRST}} lastname ${{ inputs.LAST}} password ${{ inputs.TEMP_PASS}}
+        echo ${{ inputs.FIRST}} ${{ inputs.LAST}} CREATED!
+
+    - name: Add Contractor to groups
+      if: ${{ inputs.CONTRACTOR != '' }} 
+      run: |
+        /home/user/bin/gam/gam update group allactiveusers add member ${{ inputs.LOGIN}}
+        echo ADDING CONTRACTOR TO ALLACTIVEUSERS ONLY!
+
+    - name: Add Employee to groups
+      if: ${{ inputs.CONTRACTOR == '' }} 
+      run: |
+        /home/user/bin/gam/gam update group allactiveusers add member ${{ inputs.LOGIN}}
+        /home/user/bin/gam/gam update group employees add member ${{ inputs.LOGIN}}
+        echo ADDING EMPLOYEE TO ALLACTIVEUSERS!
+        echo ADDING EMPLOYEE TO EMPLOYEES!
+
+  provision_meraki:
+    name: MBUILD
+    runs-on: onprem-server
+    needs: [provision_google]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Create Meraki Account
+      id: meraki-vpn
+      if: ${{ inputs.Meraki_VPN != '' }} 
+      run: |
+        curl -L --request POST \
+         --url https://api.meraki.com/api/v1/networks/L_numbers/merakiAuthUsers \
+         --header 'Authorization: Bearer ${{ secrets.MERAKIAUTH}}' \
+         --header 'Content-Type: application/json' \
+         --header 'Accept: application/json' \
+         --data '{
+             "email": "${{ inputs.LOGIN}}@org.com",
+             "name": "${{ inputs.FIRST}} ${{ inputs.LAST}}",
+             "password": "${{ inputs.TEMP_PASS}}",
+             "accountType": "Client VPN",
+             "emailPasswordToUser": false,
+             "isAdmin": false,
+             "authorizations": [
+                 {
+                     "expiresAt": "Never"
+                 }
+             ]
+         }'
