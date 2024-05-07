@@ -1,0 +1,46 @@
+name: run variable script with onprem machine
+
+on:
+   workflow_dispatch:
+    inputs:
+      ENVIRONMENT:
+        description: 'STAGING or PRODUCTION?'
+        type: choice
+        required: false
+        default: 'PRODUCTION'
+        options: 
+        - STAGING
+        - PRODUCTION
+
+      BARCODE:
+        required: true
+        default: ''
+
+      NAME:
+        required: false
+        default: ''
+
+      UNIT:
+        required: false
+        default: ''
+    
+jobs:
+  build:
+    name: Build
+    runs-on: onprem-machine
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+#      with:
+#       ref: rapid_fire_zip_upload
+
+    - name: deploy and run python script for RF
+      id: run-rf
+      env:
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        /home/sequencing/.local/bin/pipenv --version
+        python3.11 --version
+        /home/sequencing/.local/bin/pipenv install --deploy --python 3.11
+        echo "Let's run this workflow against ${{ inputs.BARCODE}}"
+        /home/user/.local/bin/pipenv run python3.11 script_upload.py ${{ inputs.BARCODE}}
