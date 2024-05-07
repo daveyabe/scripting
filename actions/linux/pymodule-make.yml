@@ -1,0 +1,40 @@
+name: build python module
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Bump version up in setup.py
+      run: |
+        sed -i "7c\\VERSION = \"1.${{ github.run_number }}\"" setup.py
+        git config user.email "it@org.com"
+        git config user.name "ORG"
+        git add setup.py
+        git commit -m "[skip ci] Updating version in setup.py [automated]"
+        git push
+        
+    - name: Install dependencies and etc
+      run: |
+        python -m pip install --upgrade pip setuptools wheel     
+        python -m pip install --upgrade pip
+        python -m pip install -r requirements.txt
+        make 
+#        let's just make all
+#        make deploy
