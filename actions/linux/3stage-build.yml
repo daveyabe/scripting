@@ -1,0 +1,113 @@
+name: build and build and build
+
+on:
+   workflow_dispatch:
+    inputs:
+      ENVIRONMENT:
+        description: 'STAGING or PRODUCTION?'
+        type: choice
+        required: false
+        default: 'PRODUCTION'
+        options: 
+        - STAGING
+        - PRODUCTION
+      BUILD_IMAGE:
+        type: boolean
+        description: should we rebuild the docker image?        
+      BARCODE:
+        description: 'we need a plate barcode (like PLT12345)'
+        required: true
+        default: 'PLT25885'
+      WELL:
+        description: 'we need a well address (like A1 or B1)'
+        required: true
+        default: 'A1'
+      SEQUENCE:
+        description: 'we need an amino acid sequence (like WAHCPADV)'
+        required: true
+        default: 'WAHCPADV'
+      PEAKLISTFILE:
+        description: 'we need an XML peak list file location'
+        required: false
+        default: '/app/project/testFiles/peaklist.xml'
+        
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: project
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+       ref: development
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      if: ${{ inputs.BUILD_IMAGE != '' }} 
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Dockerfile -t $ECR_REGISTRY/project:$IMAGE_TAG -t $ECR_REGISTRY/project:latest .
+        docker push -a $ECR_REGISTRY/project
+        
+  deploy:
+    name: Deploying project Data
+    runs-on: pipeline
+    environment: ${{ inputs.ENVIRONMENT}}  
+    needs: [build]
+    #needs: [build, poweron, pycache]
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+       ref: development
+       
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Pull docker image
+      continue-on-error: true
+      run: |
+           aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 123.dkr.ecr.us-east-1.amazonaws.com
+           sudo docker pull 015042944066.dkr.ecr.us-east-1.amazonaws.com/project:latest
+           sudo docker tag 015042944066.dkr.ecr.us-east-1.amazonaws.com/project:latest project:latest
+
+    - name: Run docker image
+      run: |
+            sudo docker run -v /tmp:/tmp project:latest "${{ inputs.BARCODE}}" "${{ inputs.WELL}}" "${{ inputs.SEQUENCE}}" "${{ inputs.PEAKLISTFILE}}"
+      shell: bash
+
+    - name: create artifact
+      uses: actions/upload-artifact@v4
+      with:
+       name: peakmatchingdata
+       path: /tmp/*.json  
+
+  #sudo docker run -e ${{ inputs.BARCODE}} -e ${{ inputs.WELL}} -e ${{ inputs.SEQUENCE}} -e ${{ inputs.PEAKLISTFILE}} -v /tmp:/tmp project:latest
+  #sudo docker run -e AETHER_API_ENV=${{ inputs.ENVIRONMENT}} -e WELLCOUNT=${{ inputs.WELLCOUNT}} -v /tmp:/tmp project:latest
+  #sudo docker container prune -f
