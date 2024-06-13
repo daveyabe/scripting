@@ -1,0 +1,97 @@
+name: Build and Run
+
+on:
+   workflow_dispatch:
+    inputs:
+      ENVIRONMENT:
+        description: 'STAGING or PRODUCTION?'
+        type: choice
+        required: true
+        default: 'STAGING'
+        options: 
+        - STAGING
+        - PRODUCTION
+      BUILD_IMAGE:
+        type: boolean
+        description: should we rebuild the docker image?        
+      WELLCOUNT:
+        description: 'not a regular 384 or 1536 wellcount? use IRREGULAR.'
+        type: choice
+        required: false
+        default: 'REGULAR'
+        options: 
+        - REGULAR
+        - IRREGULAR
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: someproject
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      if: ${{ inputs.BUILD_IMAGE != '' }} 
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Dockerfile -t $ECR_REGISTRY/someproject:$IMAGE_TAG -t $ECR_REGISTRY/someproject:latest .
+        docker push -a $ECR_REGISTRY/someproject
+        
+  deploy:
+    name: Deploying MALDI Data
+    runs-on: someprojectserver
+    environment: ${{ inputs.ENVIRONMENT}}  
+    needs: [build]
+    #needs: [build, poweron, pycache]
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Pull docker image
+      continue-on-error: true
+      run: |
+           aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 0123456.dkr.ecr.us-east-1.amazonaws.com
+           sudo docker pull 015042944066.dkr.ecr.us-east-1.amazonaws.com/someproject:latest
+           sudo docker tag 015042944066.dkr.ecr.us-east-1.amazonaws.com/someproject:latest someproject:latest
+
+    - name: Run docker image
+      run: |
+        if [ ${{ inputs.WELLCOUNT}} = 'REGULAR' ]; then
+            sudo docker run -e API_ENV=${{ inputs.ENVIRONMENT}} -e WELLCOUNT=${{ inputs.WELLCOUNT}} -v /root/raw:/app/raw someproject:latest
+            sudo docker container prune -f
+        else
+            sudo docker run -e API_ENV=${{ inputs.ENVIRONMENT}} -e WELLCOUNT=${{ inputs.WELLCOUNT}} -v /root/raw_short:/app/raw someproject:latest
+            sudo docker container prune -f
+        fi
+      shell: bash
