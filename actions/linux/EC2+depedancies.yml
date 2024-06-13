@@ -1,0 +1,141 @@
+name: Build and Run
+
+on:
+#   schedule:
+#     - cron: '0 3 * * 0'
+   workflow_dispatch:
+    inputs:
+      DOCKER_BARCODE:
+        description: 'enter your barcode'
+        required: true
+        default: 'WF12345'
+      BUILD_IMAGE:
+        type: boolean
+        description: should we rebuild the docker image?
+      ENVIRONMENT:
+        description: 'DEVELOPMENT or STAGING or PRODUCTION?'
+        type: choice
+        required: true
+        default: 'DEVELOPMENT'
+        options: 
+        - DEVELOPMENT
+        - STAGING
+        - PRODUCTION
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: someproject
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      if: ${{ inputs.BUILD_IMAGE != '' }} 
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Dockerfile -t $ECR_REGISTRY/someproject:$IMAGE_TAG -t $ECR_REGISTRY/someproject:latest --build-arg workflow_barcode=${{ inputs.DOCKER_BARCODE }} .
+        docker push -a $ECR_REGISTRY/someproject
+
+  poweron:
+    name: PowerOn
+    runs-on: ubuntu-latest
+    environment: production   
+    needs: [build]
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Start AWS EC2
+      run: |
+          aws ec2 start-instances --instance-ids i-03f4a1bf42f6183cb #${{secrets.AWS_EC2_INSTANCE_ID }}
+
+    - name: Sleep for 30 seconds
+      run: sleep 60s
+      shell: bash
+
+    - name: Get EC2 IP
+      run: |
+          aws ec2 describe-instances --instance-ids i-03f4a1bf42f6183cb --query 'Reservations[*].Instances[*].PublicIpAddress' --output text
+
+  pycache:
+    name: pycache
+    runs-on: linux-someprojectserver
+    environment: production   
+    needs: [build, poweron]
+    steps:         
+    - name: Setup and Docker RUN!
+      run: |
+           sudo rm -rf __pycache__
+
+  deploy:
+    name: Dockering
+    runs-on: linux-someprojectserver
+    environment: ${{ inputs.ENVIRONMENT}}   
+    needs: [build, poweron, pycache]
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+#      with:
+#        ref: noninteractive    
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Setup and Docker RUN!
+      run: |
+           sudo docker system prune -f
+           aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 015042944066.dkr.ecr.us-east-1.amazonaws.com
+           sudo docker pull 015042944066.dkr.ecr.us-east-1.amazonaws.com/someproject:latest
+           sudo docker tag 015042944066.dkr.ecr.us-east-1.amazonaws.com/someproject:latest someproject:latest
+           sudo docker run -e workflow_barcode=${{ inputs.DOCKER_BARCODE }} -e AETHER_API_ENV=${{ inputs.ENVIRONMENT}} someproject:latest
+
+  poweroff:
+    name: PowerOff
+    runs-on: ubuntu-latest
+    environment: production   
+    if: ${{ always() }}    
+    needs: [poweron, pycache, deploy]
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: STOP AWS EC2
+      run: |
+          aws ec2 stop-instances --instance-ids i-03f4a1bf42f6183cb
